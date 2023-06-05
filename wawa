@@ -1,0 +1,75 @@
+#include <iostream>
+#include <thread>
+#include <vector>
+#include <mutex>
+#include <atomic>
+
+std::mutex mtx; // Mutex to protect shared data
+std::atomic<int> frequencyA(0);
+std::atomic<int> frequencyC(0);
+std::atomic<int> frequencyG(0);
+std::atomic<int> frequencyT(0);
+
+// Worker function for each thread
+void calculateFrequency(const std::string& sequence, int start, int end) {
+    int localFrequencyA = 0;
+    int localFrequencyC = 0;
+    int localFrequencyG = 0;
+    int localFrequencyT = 0;
+    
+    for (int i = start; i < end; ++i) {
+        switch (sequence[i]) {
+            case 'A':
+                ++localFrequencyA;
+                break;
+            case 'C':
+                ++localFrequencyC;
+                break;
+            case 'G':
+                ++localFrequencyG;
+                break;
+            case 'T':
+                ++localFrequencyT;
+                break;
+        }
+    }
+    
+    std::lock_guard<std::mutex> lock(mtx); // Lock the mutex
+    frequencyA += localFrequencyA; // Update the global frequencies
+    frequencyC += localFrequencyC;
+    frequencyG += localFrequencyG;
+    frequencyT += localFrequencyT;
+}
+
+int main() {
+    std::string dnaSequence = "ACGTACGTACGTACGT"; // Example DNA sequence
+    int numThreads = 4; // Number of worker threads
+    
+    int sectionSize = dnaSequence.size() / numThreads;
+    std::vector<std::thread> threads;
+    
+    for (int i = 0; i < numThreads; ++i) {
+        int start = i * sectionSize;
+        int end = (i == numThreads - 1) ? dnaSequence.size() : (i + 1) * sectionSize;
+        threads.emplace_back(calculateFrequency, std::ref(dnaSequence), start, end);
+    }
+    
+    // Wait for all worker threads to finish
+    for (auto& thread : threads) {
+        thread.join();
+    }
+    
+    // Combine the results from all worker threads
+    int totalFrequencyA = frequencyA;
+    int totalFrequencyC = frequencyC;
+    int totalFrequencyG = frequencyG;
+    int totalFrequencyT = frequencyT;
+    
+    // Print the total frequency of each nucleotide
+    std::cout << "Frequency of A: " << totalFrequencyA << std::endl;
+    std::cout << "Frequency of C: " << totalFrequencyC << std::endl;
+    std::cout << "Frequency of G: " << totalFrequencyG << std::endl;
+    std::cout << "Frequency of T: " << totalFrequencyT << std::endl;
+    
+    return 0;
+}
